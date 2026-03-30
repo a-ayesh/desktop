@@ -1,0 +1,25 @@
+{
+  "name": "desktop",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true,
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "installOhMyZshConfig": true
+    }
+  },
+  "remoteUser": "node",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-azuretools.vscode-docker"],
+      "settings": {
+        "dev.containers.copyGitConfig": true,
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}
