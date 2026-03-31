@@ -71,13 +71,22 @@ export default function DocsPage() {
         <h2 id="deployment">Deployment</h2>
         <p>
           The site uses <code>output: &quot;export&quot;</code> in{" "}
-          <code>next.config.ts</code>, producing a fully-static{" "}
-          <code>out/</code> folder. Deploy to GitHub Pages by pushing that
-          folder to your <code>gh-pages</code> branch.
+          <code>next.config.ts</code>, producing a static{" "}
+          <code>out/</code> directory. For GitHub project pages (
+          <code>
+            https://&lt;user&gt;.github.io/&lt;repo&gt;/
+          </code>
+          ), CI sets <code>GITHUB_REPOSITORY</code> so{" "}
+          <code>basePath</code> matches the repo name. Repos named{" "}
+          <code>*.github.io</code> use no subpath (user/org root site).
         </p>
-        <pre><code>{`# Build static output
-pnpm build
-# Push to GitHub Pages`}</code></pre>
+        <p>
+          Enable <strong>Settings → Pages → GitHub Actions</strong> as the
+          source; the workflow <code>.github/workflows/deploy-github-pages.yml</code>{" "}
+          builds and uploads <code>out/</code>. A <code>public/.nojekyll</code>{" "}
+          file ensures the <code>_next</code> assets are not stripped by Jekyll.
+        </p>
+        <pre><code>{`pnpm build   # writes to out/`}</code></pre>
       </div>
     </Reader>
   );

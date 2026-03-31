@@ -42,7 +42,7 @@ export const HARDCODED_RESPONSES: HardcodedResponse[] = [
   {
     keywords: ["deploy", "github", "pages", "hosting", "build"],
     response:
-      "To deploy to GitHub Pages:\n\n1. Run pnpm build to generate the out/ folder\n2. Push out/ to your gh-pages branch, or configure GitHub Actions\n3. Set basePath in next.config.ts to match your repo name\n\nSee the Docs app for more details!",
+      "To deploy to GitHub Pages:\n\n1. Run pnpm build — output goes to out/\n2. Use the included GitHub Actions workflow (Settings → Pages → GitHub Actions), or upload out/ manually\n3. In CI, GITHUB_REPOSITORY sets basePath for project sites (user.github.io/repo/); *.github.io repos use the site root\n\nSee the Docs app for more details!",
   },
   {
     keywords: ["mdx", "markdown", "content", "blog", "docs"],
