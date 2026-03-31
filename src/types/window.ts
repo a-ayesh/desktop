@@ -42,12 +42,10 @@ export interface AppSettings {
   center?: boolean;
 }
 
-export type ColorMode = "light" | "dark";
 export type ExperienceMode = "desktop" | "boring";
-export type WallpaperMode = "default" | "dark";
+export type WallpaperMode = "default";
 
 export interface SiteSettings {
-  colorMode: ColorMode;
   experience: ExperienceMode;
   wallpaper: WallpaperMode;
 }

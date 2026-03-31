@@ -1,0 +1,55 @@
+# Hello, world!
+
+Welcome to the first post on this desktop. This is written in **MDX** — Markdown with JSX superpowers.
+
+## What is MDX?
+
+MDX lets you embed React components directly in Markdown content. That means you can write prose like this…
+
+```tsx
+export default function HelloWorld() {
+  return <h1>Hello, world!</h1>
+}
+```
+
+…and also drop in rich custom components like callout boxes, interactive demos, and more.
+
+<CalloutBox type="note">
+  This is a note callout. Use `type="warning"`, `type="danger"`, or `type="success"` for other styles.
+</CalloutBox>
+
+## Why MDX for a desktop OS?
+
+Treating content as data lets you:
+
+- Write docs, blog posts, and handbooks in Markdown
+- Include custom components inline (screenshots, tables, callouts)
+- Keep content separate from presentation code
+- Use the same prose styling everywhere
+
+<CalloutBox type="success">
+  The `prose-desktop` class handles all typography automatically — headings, paragraphs, lists, code blocks, blockquotes, and tables.
+</CalloutBox>
+
+## Keyboard shortcuts recap
+
+| Key | Action |
+|-----|--------|
+| `/` or `⌘K` | Open search |
+| `?` | Open Ask Max |
+| `Esc` | Close panels |
+
+## Code example
+
+Here's a quick look at how a window is opened:
+
+```typescript
+openWindow(
+  "my-app",       // unique ID
+  MyComponent,    // React component
+  "My App",       // title bar text
+  { foo: "bar" }  // props forwarded to component
+);
+```
+
+That's all for now. More posts coming soon!

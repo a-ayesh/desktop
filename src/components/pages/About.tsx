@@ -6,45 +6,49 @@ import Editor from "@/components/apps/Editor";
 export default function AboutPage() {
   return (
     <Editor>
-      <div className="space-y-4 text-sm leading-relaxed">
-        <h1 className="text-xl font-semibold text-primary">About</h1>
-        <p className="text-secondary">
-          This codebase is a lean, GitHub Pages-hostable desktop OS UI built in
-          Next.js. It takes inspiration from the PostHog.com website which uses
-          a windowed desktop metaphor to navigate content.
+      <div className="prose-desktop space-y-4">
+        <h1>About this desktop</h1>
+
+        <p>
+          A browser-based desktop OS experience built with modern web tech.
+          Inspired by <a href="https://posthog.com" target="_blank" rel="noopener noreferrer">PostHog.com</a>'s
+          innovative windowed interface.
         </p>
-        <h2 className="text-base font-semibold text-primary pt-2">Stack</h2>
-        <table className="w-full text-xs border-collapse">
+
+        <h2>Tech stack</h2>
+        <ul>
+          <li><strong>Next.js 16</strong> — Static export, App Router</li>
+          <li><strong>Framer Motion</strong> — Drag, resize, and animation</li>
+          <li><strong>Tailwind CSS v4</strong> — Semantic color token system</li>
+          <li><strong>Radix UI</strong> — Accessible primitives (menus, dropdowns)</li>
+          <li><strong>MDX</strong> — Rich content authoring</li>
+        </ul>
+
+        <h2>Features</h2>
+        <ul>
+          <li>Draggable, resizable, minimizable windows</li>
+          <li>PostHog-inspired light theme</li>
+          <li>Mobile responsive (linear "boring" mode)</li>
+          <li>Spotlight-style search</li>
+          <li>Ask Max AI chat (hardcoded)</li>
+          <li>Product OS app explorer</li>
+          <li>MDX content rendering</li>
+        </ul>
+
+        <h2>Keyboard shortcuts</h2>
+        <table>
           <thead>
-            <tr className="border-b border-primary">
-              <th className="text-left py-1 pr-4 text-muted font-medium">Layer</th>
-              <th className="text-left py-1 text-muted font-medium">Technology</th>
+            <tr>
+              <th>Key</th>
+              <th>Action</th>
             </tr>
           </thead>
-          <tbody className="text-secondary">
-            {[
-              ["Framework", "Next.js 16 (static export)"],
-              ["UI", "React 19"],
-              ["Styling", "Tailwind CSS v4"],
-              ["Animation", "Framer Motion 12"],
-              ["Hosting", "GitHub Pages"],
-            ].map(([layer, tech]) => (
-              <tr key={layer} className="border-b border-primary/50">
-                <td className="py-1 pr-4 font-medium text-primary">{layer}</td>
-                <td className="py-1">{tech}</td>
-              </tr>
-            ))}
+          <tbody>
+            <tr><td><code>/</code> or <code>⌘K</code></td><td>Open search</td></tr>
+            <tr><td><code>?</code></td><td>Open Ask Max</td></tr>
+            <tr><td><code>Esc</code></td><td>Close panel / search</td></tr>
           </tbody>
         </table>
-        <h2 className="text-base font-semibold text-primary pt-2">Key features</h2>
-        <ul className="list-disc pl-5 space-y-1 text-secondary">
-          <li>Draggable, resizable windows constrained to viewport</li>
-          <li>Window stacking with z-index management</li>
-          <li>Minimize, maximize, and restore</li>
-          <li>Light / dark mode with CSS-variable theming</li>
-          <li>Responsive "boring mode" for mobile</li>
-          <li>Fully static — no server, no API calls</li>
-        </ul>
       </div>
     </Editor>
   );

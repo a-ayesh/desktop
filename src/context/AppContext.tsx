@@ -10,10 +10,8 @@ import React, {
   useState,
 } from "react";
 import type {
-  AppRegistry,
   AppSettings,
   AppWindow,
-  ColorMode,
   ExperienceMode,
   SiteSettings,
   WindowPosition,
@@ -21,9 +19,23 @@ import type {
 } from "@/types/window";
 import type { ComponentType } from "react";
 
+// ─── Types ────────────────────────────────────────────────────────────────
+
+export interface DesktopIconDef {
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  component: ComponentType<Record<string, unknown>>;
+  title: string;
+  props?: Record<string, unknown>;
+  settings?: Partial<AppSettings>;
+  category?: string;
+  description?: string;
+}
+
 // ─── Default app settings ──────────────────────────────────────────────────
 
-const DEFAULT_APP_SETTINGS: AppSettings = {
+export const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultSize: { width: 760, height: 560 },
   sizeConstraints: {
     min: { width: 400, height: 300 },
@@ -44,7 +56,7 @@ interface AppContextValue {
   constraintsRef: React.RefObject<HTMLDivElement | null>;
   taskbarHeight: number;
   setTaskbarHeight: (h: number) => void;
-  // Window actions
+  desktopIcons: DesktopIconDef[];
   openWindow: (
     id: string,
     component: ComponentType<Record<string, unknown>>,
@@ -53,17 +65,20 @@ interface AppContextValue {
     settings?: Partial<AppSettings>
   ) => void;
   closeWindow: (id: string) => void;
+  closeAllWindows: () => void;
   focusWindow: (id: string) => void;
   minimizeWindow: (id: string) => void;
   maximizeWindow: (id: string) => void;
   restoreWindow: (id: string) => void;
   updateWindowPosition: (id: string, position: WindowPosition) => void;
   updateWindowSize: (id: string, size: WindowSize) => void;
-  // Site settings
-  toggleColorMode: () => void;
   setExperience: (mode: ExperienceMode) => void;
-  // App registry
-  registerApp: (id: string, settings: AppSettings) => void;
+  isActiveWindowsPanelOpen: boolean;
+  setIsActiveWindowsPanelOpen: (open: boolean) => void;
+  searchOpen: boolean;
+  openSearch: () => void;
+  closeSearch: () => void;
+  openNewChat: (opts?: { initialQuestion?: string }) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -76,23 +91,23 @@ export function useApp(): AppContextValue {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function getDesktopCenter(
-  size: WindowSize,
-  taskbarHeight: number
-): WindowPosition {
+function getDesktopCenter(size: WindowSize, taskbarHeight: number): WindowPosition {
   if (typeof window === "undefined") return { x: 0, y: 0 };
   const x = Math.max(0, (window.innerWidth - size.width) / 2);
-  const y = Math.max(
-    0,
-    (window.innerHeight - taskbarHeight - size.height) / 2 + taskbarHeight
-  );
+  const y = Math.max(0, (window.innerHeight - taskbarHeight - size.height) / 2 + taskbarHeight);
   return { x, y };
 }
 
 function getNextZIndex(windows: AppWindow[]): number {
-  return windows.length === 0
-    ? 10
-    : Math.max(...windows.map((w) => w.zIndex)) + 1;
+  return windows.length === 0 ? 10 : Math.max(...windows.map((w) => w.zIndex)) + 1;
+}
+
+function getCascadePosition(existingWindows: AppWindow[], taskbarHeight: number): WindowPosition {
+  const offset = (existingWindows.length % 8) * 24;
+  return {
+    x: 80 + offset,
+    y: taskbarHeight + 24 + offset,
+  };
 }
 
 function createWindow(
@@ -107,7 +122,7 @@ function createWindow(
   const size = settings.defaultSize;
   const position = settings.center
     ? getDesktopCenter(size, taskbarHeight)
-    : { x: 80 + existingWindows.length * 24, y: taskbarHeight + 24 + existingWindows.length * 24 };
+    : getCascadePosition(existingWindows, taskbarHeight);
 
   return {
     id,
@@ -127,53 +142,93 @@ function createWindow(
 
 // ─── Provider ─────────────────────────────────────────────────────────────
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+interface AppProviderProps {
+  children: React.ReactNode;
+  desktopIcons?: DesktopIconDef[];
+}
+
+export function AppProvider({ children, desktopIcons = [] }: AppProviderProps) {
   const isSSR = typeof window === "undefined";
 
-  const [isMobile, setIsMobile] = useState(
-    () => !isSSR && window.innerWidth < 768
-  );
+  const [isMobile, setIsMobile] = useState(() => !isSSR && window.innerWidth < 768);
   const [windows, setWindows] = useState<AppWindow[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => ({
-    colorMode: "light",
     experience: !isSSR && window.innerWidth < 768 ? "boring" : "desktop",
     wallpaper: "default",
   }));
-  const [taskbarHeight, setTaskbarHeight] = useState(28);
-  const [appRegistry, setAppRegistry] = useState<AppRegistry>({});
+  const [taskbarHeight, setTaskbarHeight] = useState(37);
+  const [isActiveWindowsPanelOpen, setIsActiveWindowsPanelOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const autoBoringRef = useRef(false);
 
   const constraintsRef = useRef<HTMLDivElement | null>(null);
   const taskbarHeightRef = useRef(taskbarHeight);
+  taskbarHeightRef.current = taskbarHeight;
 
   const websiteMode = siteSettings.experience === "boring";
 
-  // Keep ref in sync so callbacks don't close over stale height
-  taskbarHeightRef.current = taskbarHeight;
-
-  // ── Mobile detection ──────────────────────────────────────────────────
+  // ── Mobile detection + symmetric restore ──────────────────────────────
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       if (mobile) {
-        setSiteSettings((s) => ({ ...s, experience: "boring" }));
+        setSiteSettings((s) => {
+          if (s.experience !== "boring") {
+            autoBoringRef.current = true;
+          }
+          return { ...s, experience: "boring" };
+        });
+      } else if (autoBoringRef.current) {
+        autoBoringRef.current = false;
+        setSiteSettings((s) => ({ ...s, experience: "desktop" }));
       }
     };
     window.addEventListener("resize", handleResize, { passive: true });
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ── Apply color mode class to <html> ───────────────────────────────────
-  useEffect(() => {
-    const html = document.documentElement;
-    html.classList.remove("light", "dark");
-    html.classList.add(siteSettings.colorMode);
-  }, [siteSettings.colorMode]);
-
-  // ── Apply wallpaper to <body> ──────────────────────────────────────────
+  // ── Wallpaper → <body> attr ────────────────────────────────────────────
   useEffect(() => {
     document.body.setAttribute("data-wallpaper", siteSettings.wallpaper);
   }, [siteSettings.wallpaper]);
+
+  // ── Global keyboard shortcuts ──────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if (e.key === "Escape") {
+        if (isActiveWindowsPanelOpen) { setIsActiveWindowsPanelOpen(false); return; }
+        if (searchOpen) { setSearchOpen(false); return; }
+        return;
+      }
+
+      if (isInput) return;
+
+      if (
+        (e.key === "k" && (e.metaKey || e.ctrlKey) && !e.shiftKey) ||
+        (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.shiftKey)
+      ) {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+        return;
+      }
+
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        openNewChatImpl();
+        return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActiveWindowsPanelOpen, searchOpen]);
 
   // ─── Derived ───────────────────────────────────────────────────────────
   const focusedWindow = useMemo(() => {
@@ -182,14 +237,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return visible.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
   }, [windows]);
 
-  // ─── Actions ───────────────────────────────────────────────────────────
-
-  const registerApp = useCallback(
-    (id: string, settings: AppSettings) => {
-      setAppRegistry((r) => ({ ...r, [id]: settings }));
-    },
-    []
-  );
+  // ─── Window actions ────────────────────────────────────────────────────
 
   const openWindow = useCallback(
     (
@@ -202,23 +250,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWindows((prev) => {
         const existing = prev.find((w) => w.id === id);
         if (existing) {
-          // Bring to front and unminimize
           const maxZ = getNextZIndex(prev);
           return prev.map((w) =>
             w.id === id ? { ...w, minimized: false, zIndex: maxZ } : w
           );
         }
-        const registeredSettings = appRegistry[id] ?? DEFAULT_APP_SETTINGS;
-        const settings = { ...registeredSettings, ...overrideSettings };
+        const settings = { ...DEFAULT_APP_SETTINGS, ...overrideSettings };
         const win = createWindow(id, component, title, props, settings, prev, taskbarHeightRef.current);
         return [...prev, win];
       });
     },
-    [appRegistry]
+    []
   );
 
   const closeWindow = useCallback((id: string) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
+  }, []);
+
+  const closeAllWindows = useCallback(() => {
+    setWindows([]);
   }, []);
 
   const focusWindow = useCallback((id: string) => {
@@ -236,67 +286,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const maximizeWindow = useCallback(
-    (id: string) => {
-      if (typeof window === "undefined") return;
-      setWindows((prev) =>
-        prev.map((w) => {
-          if (w.id !== id) return w;
-          return {
-            ...w,
-            previousSize: w.size,
-            previousPosition: w.position,
-            size: {
-              width: window.innerWidth,
-              height: window.innerHeight - taskbarHeight,
-            },
-            position: { x: 0, y: taskbarHeight },
-            zIndex: getNextZIndex(prev),
-          };
-        })
-      );
-    },
-    [taskbarHeight]
-  );
-
-  const restoreWindow = useCallback((id: string) => {
+  const maximizeWindow = useCallback((id: string) => {
+    if (typeof window === "undefined") return;
     setWindows((prev) =>
       prev.map((w) => {
         if (w.id !== id) return w;
         return {
           ...w,
-          size: w.previousSize,
-          position: w.previousPosition,
+          previousSize: w.size,
+          previousPosition: w.position,
+          size: { width: window.innerWidth, height: window.innerHeight - taskbarHeightRef.current },
+          position: { x: 0, y: taskbarHeightRef.current },
+          zIndex: getNextZIndex(prev),
         };
       })
     );
   }, []);
 
-  const updateWindowPosition = useCallback(
-    (id: string, position: WindowPosition) => {
-      setWindows((prev) =>
-        prev.map((w) => (w.id === id ? { ...w, position } : w))
-      );
-    },
-    []
-  );
-
-  const updateWindowSize = useCallback((id: string, size: WindowSize) => {
+  const restoreWindow = useCallback((id: string) => {
     setWindows((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, size } : w))
+      prev.map((w) => {
+        if (w.id !== id) return w;
+        return { ...w, size: w.previousSize, position: w.previousPosition };
+      })
     );
   }, []);
 
-  const toggleColorMode = useCallback(() => {
-    setSiteSettings((s) => ({
-      ...s,
-      colorMode: (s.colorMode === "light" ? "dark" : "light") as ColorMode,
-    }));
+  const updateWindowPosition = useCallback((id: string, position: WindowPosition) => {
+    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, position } : w)));
+  }, []);
+
+  const updateWindowSize = useCallback((id: string, size: WindowSize) => {
+    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, size } : w)));
   }, []);
 
   const setExperience = useCallback((mode: ExperienceMode) => {
+    if (mode === "desktop") autoBoringRef.current = false;
     setSiteSettings((s) => ({ ...s, experience: mode }));
   }, []);
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+  function openNewChatImpl(opts?: { initialQuestion?: string }) {
+    const chatIcon = desktopIcons.find((i) => i.id === "ask-max");
+    if (!chatIcon) return;
+    setWindows((prev) => {
+      const existing = prev.find((w) => w.id === "ask-max");
+      if (existing) {
+        const maxZ = getNextZIndex(prev);
+        return prev.map((w) =>
+          w.id === "ask-max" ? { ...w, minimized: false, zIndex: maxZ } : w
+        );
+      }
+      const chatWidth = 360;
+      const chatHeight = 480;
+      const x = typeof window !== "undefined" ? window.innerWidth - chatWidth - 16 : 400;
+      const y = typeof window !== "undefined" ? window.innerHeight - chatHeight - 16 : 100;
+      const win: AppWindow = {
+        id: "ask-max",
+        title: opts?.initialQuestion ? opts.initialQuestion.slice(0, 40) : "Ask Max",
+        component: chatIcon.component,
+        props: { initialQuestion: opts?.initialQuestion },
+        zIndex: getNextZIndex(prev),
+        minimized: false,
+        position: { x, y },
+        previousPosition: { x, y },
+        size: { width: chatWidth, height: chatHeight },
+        previousSize: { width: chatWidth, height: chatHeight },
+        sizeConstraints: {
+          min: { width: 300, height: 360 },
+          max: { width: 480, height: 640 },
+        },
+        fixedSize: false,
+      };
+      return [...prev, win];
+    });
+  }
+
+  const openNewChat = useCallback((opts?: { initialQuestion?: string }) => {
+    openNewChatImpl(opts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desktopIcons]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -308,17 +379,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       constraintsRef,
       taskbarHeight,
       setTaskbarHeight,
+      desktopIcons,
       openWindow,
       closeWindow,
+      closeAllWindows,
       focusWindow,
       minimizeWindow,
       maximizeWindow,
       restoreWindow,
       updateWindowPosition,
       updateWindowSize,
-      toggleColorMode,
       setExperience,
-      registerApp,
+      isActiveWindowsPanelOpen,
+      setIsActiveWindowsPanelOpen,
+      searchOpen,
+      openSearch,
+      closeSearch,
+      openNewChat,
     }),
     [
       windows,
@@ -327,17 +404,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       websiteMode,
       siteSettings,
       taskbarHeight,
+      desktopIcons,
       openWindow,
       closeWindow,
+      closeAllWindows,
       focusWindow,
       minimizeWindow,
       maximizeWindow,
       restoreWindow,
       updateWindowPosition,
       updateWindowSize,
-      toggleColorMode,
       setExperience,
-      registerApp,
+      isActiveWindowsPanelOpen,
+      searchOpen,
+      openSearch,
+      closeSearch,
+      openNewChat,
     ]
   );
 

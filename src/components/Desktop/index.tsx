@@ -1,82 +1,126 @@
 "use client";
 
 import React from "react";
+import { motion } from "framer-motion";
 import { useApp } from "@/context/AppContext";
-import type { ComponentType } from "react";
+import type { DesktopIconDef } from "@/context/AppContext";
 import type { AppSettings } from "@/types/window";
 
-// ─── Desktop icon ──────────────────────────────────────────────────────────
+// ─── Column layout constants (mirrors PostHog) ─────────────────────────────
 
-export interface DesktopIconDef {
-  id: string;
-  label: string;
-  icon: string; // emoji or short text for now
-  component: ComponentType<Record<string, unknown>>;
-  title: string;
-  props?: Record<string, unknown>;
-  settings?: Partial<AppSettings>;
+const ICON_WIDTH = 112;
+const ICON_HEIGHT = 75;
+const PADDING_HORIZONTAL = 4;
+const PADDING_VERTICAL = 20;
+const COLUMN_SPACING = 128;
+
+function generateInitialPositions(
+  icons: DesktopIconDef[],
+  containerHeight: number
+): Array<{ x: number; y: number }> {
+  const usableHeight = containerHeight - PADDING_VERTICAL * 2;
+  const iconsPerColumn = Math.max(1, Math.floor(usableHeight / ICON_HEIGHT));
+
+  return icons.map((_, i) => {
+    const col = Math.floor(i / iconsPerColumn);
+    const row = i % iconsPerColumn;
+    return {
+      x: PADDING_HORIZONTAL + col * COLUMN_SPACING,
+      y: PADDING_VERTICAL + row * ICON_HEIGHT,
+    };
+  });
 }
 
-function DesktopIcon({ def }: { def: DesktopIconDef }) {
+// ─── Desktop Icon ──────────────────────────────────────────────────────────
+
+function DesktopIcon({
+  id,
+  label,
+  icon: IconComponent,
+  component,
+  title,
+  props,
+  settings,
+  position,
+}: {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  component: React.ComponentType<Record<string, unknown>>;
+  title: string;
+  props?: Record<string, unknown>;
+  settings?: AppSettings;
+  position: { x: number; y: number };
+}) {
   const { openWindow } = useApp();
 
   return (
-    <button
-      onDoubleClick={() =>
-        openWindow(def.id, def.component, def.title, def.props, def.settings)
-      }
-      onClick={() =>
-        openWindow(def.id, def.component, def.title, def.props, def.settings)
-      }
-      className="
-        flex flex-col items-center gap-1 p-2 w-[72px]
-        rounded cursor-pointer select-none
-        text-primary hover:bg-white/20 active:bg-white/30
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-blue
-        transition-colors group
-      "
+    <motion.li
+      whileDrag={{ scale: 1.1, rotate: 2 }}
+      style={{ position: "absolute", left: position.x, top: position.y, width: ICON_WIDTH }}
+      className="list-none"
     >
-      <div
-        className="
-          size-12 flex items-center justify-center
-          rounded-xl text-2xl
-          bg-white/10 group-hover:bg-white/20 transition-colors
-          shadow-sm
-        "
+      <button
+        onClick={() => openWindow(id, component, title, props, settings)}
+        className="inline-flex flex-col justify-center items-center w-auto space-y-0.5 max-w-28 text-center cursor-pointer select-none focus:outline-none group"
+        style={{ width: ICON_WIDTH }}
       >
-        {def.icon}
-      </div>
-      <span
-        className="
-          text-[11px] font-medium text-center leading-tight
-          px-1 rounded
-          text-primary
-          max-w-full truncate w-full
-        "
-      >
-        {def.label}
-      </span>
-    </button>
+        <div className="size-10 flex items-center justify-center">
+          <IconComponent className="size-7 text-primary" />
+        </div>
+
+        <span
+          className="
+            text-[13px] font-medium leading-tight text-center text-balance
+            text-primary px-0.5 rounded-[2px] max-w-full
+            bg-[rgba(238,239,233,0.75)] group-hover:bg-[rgba(238,239,233,1)]
+          "
+        >
+          {label}
+        </span>
+      </button>
+    </motion.li>
   );
 }
 
 // ─── Desktop ───────────────────────────────────────────────────────────────
 
-let _registeredIcons: DesktopIconDef[] = [];
-
-/** Call this to register icons with the Desktop (done in page.tsx) */
-export function registerDesktopIcons(icons: DesktopIconDef[]) {
-  _registeredIcons = icons;
-}
-
 export default function Desktop() {
+  const { desktopIcons } = useApp();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = React.useState(600);
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    obs.observe(containerRef.current);
+    setContainerHeight(containerRef.current.clientHeight);
+    return () => obs.disconnect();
+  }, []);
+
+  const positions = generateInitialPositions(desktopIcons, containerHeight);
+
   return (
-    <div className="absolute inset-0 p-4 flex flex-col gap-y-2">
-      <div className="flex flex-wrap gap-2 content-start">
-        {_registeredIcons.map((def) => (
-          <DesktopIcon key={def.id} def={def} />
+    <div ref={containerRef} className="absolute inset-0">
+      <ul className="relative w-full h-full m-0 p-0">
+        {desktopIcons.map((def, i) => (
+          <DesktopIcon
+            key={def.id}
+            id={def.id}
+            label={def.label}
+            icon={def.icon}
+            component={def.component}
+            title={def.title}
+            props={def.props}
+            settings={def.settings as AppSettings | undefined}
+            position={positions[i]}
+          />
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
