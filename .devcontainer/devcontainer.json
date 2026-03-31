@@ -1,5 +1,8 @@
 {
   "name": "desktop",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/node/.ssh,type=bind,consistency=cached"
+  ],
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -17,7 +20,8 @@
       "extensions": ["ms-azuretools.vscode-docker"],
       "settings": {
         "dev.containers.copyGitConfig": true,
-        "terminal.integrated.defaultProfile.linux": "zsh"
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.inheritEnv": true
       }
     }
   },

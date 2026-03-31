@@ -2,6 +2,12 @@
 set -euo pipefail
 
 # postCreateCommand runs as remoteUser (`node`), not root—do not use `corepack enable` here (EACCES on /usr/local/bin).
+# If host ~/.ssh is bind-mounted, tighten modes so OpenSSH accepts private keys (host UIDs may differ).
+if [[ -d "${HOME}/.ssh" ]]; then
+  chmod 700 "${HOME}/.ssh" 2>/dev/null || true
+  find "${HOME}/.ssh" -maxdepth 1 -type f \( -name 'id_*' -o -name '*.pem' \) -exec chmod 600 {} \; 2>/dev/null || true
+fi
+
 ZSHRC="/home/node/.zshrc"
 
 # Starship: https://starship.rs/guide/#step-1-install-starship
